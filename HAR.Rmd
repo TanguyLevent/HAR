@@ -1,0 +1,94 @@
+---
+title: "Human Activity Recognition"
+author: "Tanguy Levent"
+date: "21 mars 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways : A: exactly according to the specification B: throwing the elbows to the front C: lifting the dumbbell only halfway D: lowering the dumbbell only halfway E: throwing the hips to the front
+
+## Getting and Cleaning Data  
+
+
+### 1 - Dataset  
+
+- The training dataset for this project is available [Here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)  
+- The testing dataset for this project is available [Here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)  
+
+### 2 - Loading
+
+```{r, message =FALSE, warning=FALSE}
+library(caret)
+library(rpart)
+library(randomForest)
+
+training <- read.csv("data/pml-training.csv")
+testing <- read.csv("data/pml-testing.csv")
+```
+
+### 3 - Partitioning
+
+```{r , message =FALSE, warning=FALSE}
+inTrain <- createDataPartition(training$classe, p= 0.7, list = FALSE)
+
+TrainSet <- training[inTrain, ]
+TestSet <- training[-inTrain,]
+```
+
+### 4 - Cleaning
+```{r , message =FALSE, warning=FALSE}
+
+# Near Zero variance
+NZV <- nearZeroVar(TrainSet)
+TrainSet <- TrainSet[,-NZV]
+TestSet <- TestSet[,-NZV]
+
+# NA Values
+IsNa <- sapply(TrainSet, function(x) mean(is.na(x))) > 0.95
+TrainSet <- TrainSet[, IsNa == FALSE]
+TestSet  <- TestSet[, IsNa == FALSE]
+
+# Idenfification variables
+TrainSet <- TrainSet[, -(1:6)]
+TestSet  <- TestSet[, -(1:6)]
+```
+
+## Classification Model selection
+
+### 1 - Decision Tree
+
+```{r , message =FALSE, warning=FALSE}
+set.seed(1991)
+FitTree <- rpart(classe ~ ., data = TrainSet, method = "class")
+PredictTree <- predict(FitTree, TestSet, type = "class")
+ConfMatTree <- confusionMatrix(PredictTree, TestSet$classe)
+ConfMatTree
+```
+
+### 2 - Random Forests
+
+```{r , message =FALSE, warning=FALSE}
+set.seed(1991)
+FitRandForest <- train(classe ~ ., data = TrainSet, method = "rf", number = 5, trControl = trainControl(method = "cv"))
+PredictRandForest <- predict(FitRandForest, TestSet)
+ConfMatRandForest <- confusionMatrix(PredictRandForest, TestSet$classe)
+ConfMatRandForest
+```
+
+
+## Prediction on the Testing Data
+
+With the previous part we have seen that random forests with 0.99 of accuracy versus 0.67 for decision tree is better for the prediction.
+
+```{r , message =FALSE, warning=FALSE}
+prediction <- predict(FitRandForest, testing)
+prediction
+```
